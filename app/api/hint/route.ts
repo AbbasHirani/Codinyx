@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getUser } from "@/lib/auth/getUser";
 import { prisma } from "@/lib/db/prisma";
 import { getHint, containsSolution, type HintTier, type MentorMode } from "@/lib/ai/hints";
 import { z } from "zod";
@@ -11,24 +11,35 @@ const schema = z.object({
   attemptId: z.string().optional(),
 });
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204 });
+}
+
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getUser(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const { problemId, tier, userCode, attemptId } = parsed.data;
-  const userId = session.user.id!;
+  const userId = user.id;
 
-  const [problem, user, weakSkills] = await Promise.all([
+  const [problem, dbUser, weakSkills, prevHints] = await Promise.all([
     prisma.problem.findUnique({ where: { id: problemId } }),
     prisma.user.findUnique({ where: { id: userId }, select: { mentorMode: true } }),
     prisma.skillProfile.findMany({
       where: { userId, proficiency: { lt: 40 } },
       select: { tag: true },
     }),
+    attemptId
+      ? prisma.hintLog.findMany({
+          where: { attemptId },
+          orderBy: { timestamp: "asc" },
+          select: { tier: true, hintText: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   if (!problem) return NextResponse.json({ error: "Problem not found" }, { status: 404 });
@@ -40,7 +51,8 @@ export async function POST(req: NextRequest) {
     constraints: problem.constraints,
     userCode,
     weakTags: weakSkills.map((s) => s.tag),
-    mentorMode: (user?.mentorMode ?? "neutral") as MentorMode,
+    mentorMode: ((dbUser as { mentorMode?: string } | null)?.mentorMode ?? "neutral") as MentorMode,
+    previousHints: prevHints.map((h) => ({ tier: h.tier as HintTier, text: h.hintText })),
   });
 
   if (tier < 4 && containsSolution(hint)) {

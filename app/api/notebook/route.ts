@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getUser } from "@/lib/auth/getUser";
 import { prisma } from "@/lib/db/prisma";
 import { generateNotebookEntry } from "@/lib/ai/debug";
 import { z } from "zod";
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204 });
+}
+
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getUser(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const tag = searchParams.get("tag");
@@ -14,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const entries = await prisma.notebookEntry.findMany({
     where: {
-      userId: session.user.id,
+      userId: user.id,
       ...(tag ? { tags: { has: tag } } : {}),
       ...(q
         ? {
@@ -39,22 +43,20 @@ const generateSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getUser(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const parsed = generateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const { problemId, code, language } = parsed.data;
-  const userId = session.user.id!;
+  const userId = user.id;
 
   const problem = await prisma.problem.findUnique({ where: { id: problemId } });
   if (!problem) return NextResponse.json({ error: "Problem not found" }, { status: 404 });
 
-  const existing = await prisma.notebookEntry.findFirst({
-    where: { userId, problemId },
-  });
+  const existing = await prisma.notebookEntry.findFirst({ where: { userId, problemId } });
 
   const generated = await generateNotebookEntry(
     problem.title,
@@ -72,13 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   const entry = await prisma.notebookEntry.create({
-    data: {
-      userId,
-      problemId,
-      ...generated,
-      codeSnippet: code,
-      tags: problem.tags as string[],
-    },
+    data: { userId, problemId, ...generated, codeSnippet: code, tags: problem.tags as string[] },
   });
 
   return NextResponse.json(entry, { status: 201 });

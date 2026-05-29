@@ -2,8 +2,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+const geminiModelName = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+
 export const geminiModel = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash-lite",
+  model: geminiModelName,
 });
 
 export async function generateText(prompt: string, systemPrompt?: string): Promise<string> {
@@ -12,6 +14,19 @@ export async function generateText(prompt: string, systemPrompt?: string): Promi
     : [{ text: prompt }];
 
   const result = await geminiModel.generateContent({ contents: [{ role: "user", parts }] });
+  return result.response.text();
+}
+
+export async function generateChat(
+  messages: { role: "user" | "assistant"; content: string }[],
+  systemPrompt: string
+): Promise<string> {
+  const model = genAI.getGenerativeModel({ model: geminiModelName, systemInstruction: systemPrompt });
+  const contents = messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+  const result = await model.generateContent({ contents });
   return result.response.text();
 }
 

@@ -9,7 +9,8 @@
       "Bash(rm -rf \"E:/Development/PROJECTS/codinyx-app\")",
       "Bash(npm install *)",
       "Bash(npx prisma *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm run *)"
     ]
   }
 }
