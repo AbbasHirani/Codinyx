@@ -50,7 +50,11 @@ export async function registerExtensionContext(body: {
     method: "POST",
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Failed to register context");
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("API Error Context:", text);
+    throw new Error(`Failed to register context: ${res.status} ${text}`);
+  }
   return res.json();
 }
 

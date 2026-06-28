@@ -14,17 +14,33 @@ const schema = z.object({
   difficulty: z.string().optional(),
 });
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204 });
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
   const user = await getUser(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user || user._debugError) {
+    return NextResponse.json({ 
+      error: "Unauthorized", 
+      debug: { 
+        authHeader: !!authHeader, 
+        secretHasLength: !!process.env.NEXTAUTH_SECRET,
+        jwtError: user?._debugError 
+      }
+    }, { status: 401, headers: corsHeaders });
+  }
 
   const body = await req.json();
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400, headers: corsHeaders });
 
   const { title, description, code, language, platform, url, difficulty } = parsed.data;
 
@@ -91,5 +107,5 @@ export async function POST(req: NextRequest) {
     problemId: problem.id,
     attemptId: attempt.id,
     problem,
-  });
+  }, { headers: corsHeaders });
 }

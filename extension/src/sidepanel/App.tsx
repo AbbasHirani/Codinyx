@@ -81,6 +81,7 @@ function IdleScreen({
   error: string | null;
   onDismissError: () => void;
 }) {
+  const { logout } = useAuth();
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-6 text-center">
       <div className="w-12 h-12 rounded-2xl bg-violet-600/20 flex items-center justify-center mb-2">
@@ -104,12 +105,20 @@ function IdleScreen({
         </p>
       )}
 
-      <button
-        onClick={onRefresh}
-        className="mt-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
-      >
-        Refresh
-      </button>
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={onRefresh}
+          className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium transition-colors"
+        >
+          Refresh
+        </button>
+        <button
+          onClick={logout}
+          className="px-4 py-2 rounded-lg bg-[#272730] hover:bg-[#32323e] text-[#a0a0b0] hover:text-white text-xs font-medium transition-colors"
+        >
+          Log Out
+        </button>
+      </div>
     </div>
   );
 }

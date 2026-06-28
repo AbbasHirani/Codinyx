@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useSession } from "@/store/session";
+import { logout as apiLogout } from "@/lib/api";
 
 export function useAuth() {
   const { token, setToken } = useSession(useShallow((s) => ({ token: s.token, setToken: s.setToken })));
@@ -11,5 +12,10 @@ export function useAuth() {
     });
   }, [setToken]);
 
-  return { token, isLoggedIn: !!token };
+  const logout = async () => {
+    await apiLogout();
+    setToken(null);
+  };
+
+  return { token, isLoggedIn: !!token, logout };
 }
